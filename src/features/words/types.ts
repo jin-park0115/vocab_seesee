@@ -13,6 +13,7 @@ export type Example = {
   id: string;
   wordId: string;
   sentenceNative: string;
+  sentenceReading: string | null;
   sentenceKo: string;
   contextTag: string;
 };

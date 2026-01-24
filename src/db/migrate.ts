@@ -88,6 +88,7 @@ const EXAMPLES = [
     id: 'ex_en_1',
     wordId: 'en_1',
     sentenceNative: 'A serene morning by the lake.',
+    sentenceReading: null,
     sentenceKo: '호숫가의 고요한 아침.',
     contextTag: 'daily',
   },
@@ -95,6 +96,7 @@ const EXAMPLES = [
     id: 'ex_ja_1',
     wordId: 'ja_1',
     sentenceNative: 'おはよう、今日はいい天気だね。',
+    sentenceReading: 'Ohayou, kyou wa ii tenki da ne.',
     sentenceKo: '좋은 아침, 오늘은 날씨가 좋네.',
     contextTag: 'daily',
   },
@@ -102,6 +104,7 @@ const EXAMPLES = [
     id: 'ex_zh_3',
     wordId: 'zh_3',
     sentenceNative: '我在机场等你。',
+    sentenceReading: 'Wo zai ji chang deng ni.',
     sentenceKo: '나는 공항에서 너를 기다리고 있어.',
     contextTag: 'travel',
   },
@@ -110,69 +113,101 @@ const EXAMPLES = [
 export async function migrateAndSeed(): Promise<void> {
   const db = await getDB();
 
-  await db.executeSql(
-    `CREATE TABLE IF NOT EXISTS words (
-      id TEXT PRIMARY KEY,
-      lang TEXT,
-      word TEXT,
-      reading TEXT NULL,
-      meaning_ko TEXT,
-      category TEXT
-    );`,
-  );
+  const [versionResult] = await db.executeSql('PRAGMA user_version;');
+  const currentVersion = versionResult.rows.item(0).user_version as number;
 
-  await db.executeSql(
-    `CREATE TABLE IF NOT EXISTS examples (
-      id TEXT PRIMARY KEY,
-      word_id TEXT,
-      sentence_native TEXT,
-      sentence_ko TEXT,
-      context_tag TEXT
-    );`,
-  );
+  if (currentVersion < 1) {
+    await db.executeSql(
+      `CREATE TABLE IF NOT EXISTS words (
+        id TEXT PRIMARY KEY,
+        lang TEXT,
+        word TEXT,
+        reading TEXT NULL,
+        meaning_ko TEXT,
+        category TEXT
+      );`,
+    );
 
-  await db.executeSql(
-    `CREATE TABLE IF NOT EXISTS bookmarks (
-      word_id TEXT PRIMARY KEY,
-      created_at TEXT
-    );`,
-  );
+    await db.executeSql(
+      `CREATE TABLE IF NOT EXISTS examples (
+        id TEXT PRIMARY KEY,
+        word_id TEXT,
+        sentence_native TEXT,
+        sentence_reading TEXT,
+        sentence_ko TEXT,
+        context_tag TEXT
+      );`,
+    );
 
-  const [countResult] = await db.executeSql(
-    'SELECT COUNT(*) as count FROM words;',
-  );
-  const count = countResult.rows.item(0).count as number;
+    await db.executeSql(
+      `CREATE TABLE IF NOT EXISTS bookmarks (
+        word_id TEXT PRIMARY KEY,
+        created_at TEXT
+      );`,
+    );
 
-  if (count > 0) {
-    return;
+    for (const word of WORDS) {
+      await db.executeSql(
+        `INSERT OR IGNORE INTO words (id, lang, word, reading, meaning_ko, category)
+         VALUES (?, ?, ?, ?, ?, ?);`,
+        [
+          word.id,
+          word.lang,
+          word.word,
+          word.reading,
+          word.meaningKo,
+          word.category,
+        ],
+      );
+    }
+
+    for (const example of EXAMPLES) {
+      await db.executeSql(
+        `INSERT OR IGNORE INTO examples (id, word_id, sentence_native, sentence_reading, sentence_ko, context_tag)
+         VALUES (?, ?, ?, ?, ?, ?);`,
+        [
+          example.id,
+          example.wordId,
+          example.sentenceNative,
+          example.sentenceReading,
+          example.sentenceKo,
+          example.contextTag,
+        ],
+      );
+    }
+
+    await db.executeSql('PRAGMA user_version = 1;');
   }
 
-  for (const word of WORDS) {
-    await db.executeSql(
-      `INSERT INTO words (id, lang, word, reading, meaning_ko, category)
-       VALUES (?, ?, ?, ?, ?, ?);`,
-      [
-        word.id,
-        word.lang,
-        word.word,
-        word.reading,
-        word.meaningKo,
-        word.category,
-      ],
+  if (currentVersion < 2) {
+    const [examplesInfo] = await db.executeSql(
+      "PRAGMA table_info('examples');",
     );
-  }
+    let hasReadingColumn = false;
+    for (let index = 0; index < examplesInfo.rows.length; index += 1) {
+      const row = examplesInfo.rows.item(index);
+      if (row.name === 'sentence_reading') {
+        hasReadingColumn = true;
+        break;
+      }
+    }
+    if (!hasReadingColumn) {
+      await db.executeSql(
+        'ALTER TABLE examples ADD COLUMN sentence_reading TEXT;',
+      );
+    }
 
-  for (const example of EXAMPLES) {
-    await db.executeSql(
-      `INSERT INTO examples (id, word_id, sentence_native, sentence_ko, context_tag)
-       VALUES (?, ?, ?, ?, ?);`,
-      [
-        example.id,
-        example.wordId,
-        example.sentenceNative,
-        example.sentenceKo,
-        example.contextTag,
-      ],
-    );
+    for (const example of EXAMPLES) {
+      if (example.sentenceReading) {
+        await db.executeSql(
+          `UPDATE examples
+           SET sentence_reading = ?
+           WHERE id = ? AND (sentence_reading IS NULL OR sentence_reading = '');`,
+          [example.sentenceReading, example.id],
+        );
+      }
+    }
+
+    await db.executeSql('PRAGMA user_version = 2;');
   }
 }

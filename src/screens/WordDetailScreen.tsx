@@ -88,6 +88,11 @@ export default function WordDetailScreen({route}: Props): React.JSX.Element {
               <Text style={styles.exampleNative}>
                 {example.sentenceNative}
               </Text>
+              {example.sentenceReading ? (
+                <Text style={styles.exampleReading}>
+                  {example.sentenceReading}
+                </Text>
+              ) : null}
               <Text style={styles.exampleKo}>{example.sentenceKo}</Text>
               <Text style={styles.exampleTag}>#{example.contextTag}</Text>
             </View>
@@ -175,6 +180,10 @@ const styles = StyleSheet.create({
   exampleKo: {
     fontSize: 13,
     color: '#555',
+  },
+  exampleReading: {
+    fontSize: 12,
+    color: '#777',
   },
   exampleTag: {
     fontSize: 11,

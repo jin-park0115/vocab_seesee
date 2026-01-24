@@ -37,6 +37,7 @@ export async function getExamplesByWordId(wordId: string): Promise<Example[]> {
       id: row.id,
       wordId: row.word_id,
       sentenceNative: row.sentence_native,
+      sentenceReading: row.sentence_reading ?? null,
       sentenceKo: row.sentence_ko,
       contextTag: row.context_tag,
     });
