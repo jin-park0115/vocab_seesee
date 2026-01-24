@@ -210,4 +210,16 @@ export async function migrateAndSeed(): Promise<void> {
 
     await db.executeSql('PRAGMA user_version = 2;');
   }
+
+  if (currentVersion < 3) {
+    await db.executeSql(
+      `CREATE TABLE IF NOT EXISTS exposures (
+        date TEXT,
+        word_id TEXT,
+        source TEXT
+      );`,
+    );
+
+    await db.executeSql('PRAGMA user_version = 3;');
+  }
 }

@@ -1,5 +1,7 @@
 import React, {useEffect, useState} from 'react';
 import {ActivityIndicator, SafeAreaView, StyleSheet, Text} from 'react-native';
+import {GestureHandlerRootView} from 'react-native-gesture-handler';
+import {BottomSheetModalProvider} from '@gorhom/bottom-sheet';
 
 import {migrateAndSeed} from '../db/migrate';
 import AppNavigator from '../navigation';
@@ -41,10 +43,19 @@ export default function App(): React.JSX.Element {
     );
   }
 
-  return <AppNavigator />;
+  return (
+    <GestureHandlerRootView style={styles.flex}>
+      <BottomSheetModalProvider>
+        <AppNavigator />
+      </BottomSheetModalProvider>
+    </GestureHandlerRootView>
+  );
 }
 
 const styles = StyleSheet.create({
+  flex: {
+    flex: 1,
+  },
   loadingContainer: {
     flex: 1,
     alignItems: 'center',
