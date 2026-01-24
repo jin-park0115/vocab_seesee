@@ -38,7 +38,17 @@ local.properties
 #
 node_modules/
 npm-debug.log
+
+# Yarn 관련
+.yarn/*
+!.yarn/releases
+!.yarn/plugins
+!.yarn/sdks
+!.yarn/versions
+.pnp.*
+yarn-debug.log*
 yarn-error.log
+yarn-error.log*
 
 # fastlane
 #
@@ -64,3 +74,33 @@ yarn-error.log
 
 # testing
 /coverage
+
+# Environment files
+.env
+.env.local
+.env.production
+.env.staging
+
+# NativeWind / Tailwind
+# 테일러드된 CSS 아웃풋이나 임시 캐시
+.tailwindcss
+lib/
+
+# OS specific (Windows 사용자 대비)
+Thumbs.db
+desktop.ini
+
+# VS Code
+.vscode/
+*.code-workspace
+
+# Byte-compiled / Optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# SQLite Database files
+*.db
+*.db-journal
+*.sqlite
+*.sqlite-journal
