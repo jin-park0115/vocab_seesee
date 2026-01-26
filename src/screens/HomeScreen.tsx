@@ -15,10 +15,11 @@ import WordCard from '../components/WordCard';
 import WordDetailSheet from '../components/WordDetailSheet';
 import {
   getBookmarksMap,
-  getBookmarksWordIds,
+  getBookmarksSorted,
   getTodaysWordIds,
   getWordsByIds,
-  toggleBookmark,
+  removeBookmark,
+  upsertBookmark,
 } from '../features/words/repository';
 import type {Word} from '../features/words/types';
 import type {RootStackParamList} from '../navigation';
@@ -34,16 +35,13 @@ export default function HomeScreen({navigation}: Props): React.JSX.Element {
 
   const loadData = useCallback(async () => {
     setLoading(true);
-    const [todayIds, bookmarkIds, bookmarksSet] = await Promise.all([
+    const [todayIds, bookmarksSet, savedList] = await Promise.all([
       getTodaysWordIds(),
-      getBookmarksWordIds(),
       getBookmarksMap(),
+      getBookmarksSorted(),
     ]);
 
-    const [todayList, savedList] = await Promise.all([
-      getWordsByIds(todayIds),
-      getWordsByIds(bookmarkIds),
-    ]);
+    const todayList = await getWordsByIds(todayIds);
 
     setTodayWords(todayList);
     setSavedWords(savedList);
@@ -59,10 +57,14 @@ export default function HomeScreen({navigation}: Props): React.JSX.Element {
 
   const handleToggleBookmark = useCallback(
     async (wordId: string) => {
-      await toggleBookmark(wordId);
+      if (bookmarks.has(wordId)) {
+        await removeBookmark(wordId);
+      } else {
+        await upsertBookmark(wordId);
+      }
       await loadData();
     },
-    [loadData],
+    [bookmarks, loadData],
   );
 
   const handleOpenWord = (wordId: string) => {
@@ -116,6 +118,9 @@ export default function HomeScreen({navigation}: Props): React.JSX.Element {
 
             <View style={styles.section}>
               <Text style={styles.sectionTitle}>Saved Words</Text>
+              <Text style={styles.sectionCaption}>
+                Haven't seen these in a while
+              </Text>
               {savedWords.length === 0 ? (
                 <Text style={styles.emptyText}>
                   Save words to see them here.
@@ -127,6 +132,7 @@ export default function HomeScreen({navigation}: Props): React.JSX.Element {
                       key={word.id}
                       word={word}
                       isSaved={bookmarks.has(word.id)}
+                      showSavedBadge
                       onPress={() => handleOpenWord(word.id)}
                       onToggleSaved={() => handleToggleBookmark(word.id)}
                     />
@@ -199,6 +205,10 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
     color: '#0f172a',
+  },
+  sectionCaption: {
+    fontSize: 12,
+    color: '#94a3b8',
   },
   emptyText: {
     fontSize: 13,

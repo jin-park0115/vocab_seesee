@@ -127,23 +127,37 @@ export async function getBookmarksWordIds(): Promise<string[]> {
   return ids;
 }
 
-export async function toggleBookmark(wordId: string): Promise<boolean> {
+export async function isBookmarked(wordId: string): Promise<boolean> {
   const db = await getDB();
   const [result] = await db.executeSql(
     'SELECT word_id FROM bookmarks WHERE word_id = ? LIMIT 1;',
     [wordId],
   );
 
-  if (result.rows.length > 0) {
-    await db.executeSql('DELETE FROM bookmarks WHERE word_id = ?;', [wordId]);
-    return false;
-  }
+  return result.rows.length > 0;
+}
 
+export async function upsertBookmark(wordId: string): Promise<void> {
+  const db = await getDB();
   await db.executeSql(
-    'INSERT OR REPLACE INTO bookmarks (word_id, created_at) VALUES (?, ?);',
-    [wordId, new Date().toISOString()],
+    'INSERT OR REPLACE INTO bookmarks (word_id, created_at, last_viewed_at) VALUES (?, ?, ?);',
+    [wordId, new Date().toISOString(), null],
   );
-  return true;
+}
+
+export async function removeBookmark(wordId: string): Promise<void> {
+  const db = await getDB();
+  await db.executeSql('DELETE FROM bookmarks WHERE word_id = ?;', [wordId]);
+}
+
+export async function touchBookmarkLastViewed(wordId: string): Promise<void> {
+  const db = await getDB();
+  await db.executeSql(
+    `UPDATE bookmarks
+     SET last_viewed_at = ?
+     WHERE word_id = ?;`,
+    [new Date().toISOString(), wordId],
+  );
 }
 
 export async function getBookmarksMap(): Promise<Set<string>> {
@@ -156,4 +170,32 @@ export async function getBookmarksMap(): Promise<Set<string>> {
   }
 
   return ids;
+}
+
+export async function getBookmarksSorted(): Promise<Word[]> {
+  const db = await getDB();
+  const [result] = await db.executeSql(
+    `SELECT w.*
+     FROM bookmarks b
+     JOIN words w ON w.id = b.word_id
+     ORDER BY
+       CASE WHEN b.last_viewed_at IS NULL THEN 0 ELSE 1 END,
+       b.last_viewed_at ASC,
+       b.created_at ASC;`,
+  );
+
+  const words: Word[] = [];
+  for (let index = 0; index < result.rows.length; index += 1) {
+    const row = result.rows.item(index);
+    words.push({
+      id: row.id,
+      lang: row.lang,
+      word: row.word,
+      reading: row.reading ?? null,
+      meaningKo: row.meaning_ko,
+      category: row.category,
+    });
+  }
+
+  return words;
 }

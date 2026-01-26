@@ -3,7 +3,11 @@ import type {NativeStackScreenProps} from '@react-navigation/native-stack';
 
 import type {RootStackParamList} from '../navigation';
 import WordDetailSheet from '../components/WordDetailSheet';
-import {getBookmarksMap, toggleBookmark} from '../features/words/repository';
+import {
+  getBookmarksMap,
+  removeBookmark,
+  upsertBookmark,
+} from '../features/words/repository';
 import NotFoundScreen from './NotFoundScreen';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'WordDetail'>;
@@ -38,8 +42,13 @@ export default function WordDetailScreen({
       useModal={false}
       onClose={() => navigation.goBack()}
       onToggleSaved={async () => {
-        const saved = await toggleBookmark(id.trim());
-        setIsSaved(saved);
+        if (isSaved) {
+          await removeBookmark(id.trim());
+          setIsSaved(false);
+        } else {
+          await upsertBookmark(id.trim());
+          setIsSaved(true);
+        }
       }}
       isSaved={isSaved}
     />

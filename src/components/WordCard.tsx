@@ -6,6 +6,7 @@ import type {Word} from '../features/words/types';
 type Props = {
   word: Word;
   isSaved: boolean;
+  showSavedBadge?: boolean;
   onPress: () => void;
   onToggleSaved: () => void;
 };
@@ -13,15 +14,23 @@ type Props = {
 export default function WordCard({
   word,
   isSaved,
+  showSavedBadge = false,
   onPress,
   onToggleSaved,
 }: Props): React.JSX.Element {
   return (
     <Pressable style={styles.card} onPress={onPress}>
       <View style={styles.header}>
-        <Text style={styles.meta}>
-          {word.lang.toUpperCase()} · {word.category}
-        </Text>
+        <View style={styles.metaRow}>
+          <Text style={styles.meta}>
+            {word.lang.toUpperCase()} · {word.category}
+          </Text>
+          {showSavedBadge ? (
+            <View style={styles.badge}>
+              <Text style={styles.badgeText}>Saved</Text>
+            </View>
+          ) : null}
+        </View>
         <Pressable
           onPress={onToggleSaved}
           hitSlop={8}
@@ -62,6 +71,21 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
     letterSpacing: 1,
     color: '#94a3b8',
+  },
+  metaRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  badge: {
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 10,
+    backgroundColor: '#e2e8f0',
+  },
+  badgeText: {
+    fontSize: 10,
+    color: '#64748b',
   },
   starButton: {
     width: 28,

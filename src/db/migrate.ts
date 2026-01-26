@@ -141,8 +141,9 @@ export async function migrateAndSeed(): Promise<void> {
 
     await db.executeSql(
       `CREATE TABLE IF NOT EXISTS bookmarks (
-        word_id TEXT PRIMARY KEY,
-        created_at TEXT
+        word_id TEXT PRIMARY KEY NOT NULL,
+        created_at TEXT NOT NULL,
+        last_viewed_at TEXT NULL
       );`,
     );
 
@@ -221,5 +222,38 @@ export async function migrateAndSeed(): Promise<void> {
     );
 
     await db.executeSql('PRAGMA user_version = 3;');
+  }
+
+  if (currentVersion < 4) {
+    const [bookmarkInfo] = await db.executeSql(
+      "PRAGMA table_info('bookmarks');",
+    );
+    let hasCreatedAt = false;
+    let hasLastViewedAt = false;
+    for (let index = 0; index < bookmarkInfo.rows.length; index += 1) {
+      const row = bookmarkInfo.rows.item(index);
+      if (row.name === 'created_at') {
+        hasCreatedAt = true;
+      }
+      if (row.name === 'last_viewed_at') {
+        hasLastViewedAt = true;
+      }
+    }
+
+    if (!hasCreatedAt) {
+      await db.executeSql('ALTER TABLE bookmarks ADD COLUMN created_at TEXT;');
+    }
+    if (!hasLastViewedAt) {
+      await db.executeSql(
+        'ALTER TABLE bookmarks ADD COLUMN last_viewed_at TEXT;',
+      );
+    }
+
+    await db.executeSql(
+      'UPDATE bookmarks SET created_at = ? WHERE created_at IS NULL;',
+      [new Date().toISOString()],
+    );
+
+    await db.executeSql('PRAGMA user_version = 4;');
   }
 }

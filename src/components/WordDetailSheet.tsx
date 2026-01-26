@@ -17,7 +17,9 @@ import {
 import {
   getExamplesByWordId,
   getWordById,
+  isBookmarked,
   logExposure,
+  touchBookmarkLastViewed,
 } from '../features/words/repository';
 import type {Example, Word} from '../features/words/types';
 
@@ -84,6 +86,12 @@ export default function WordDetailSheet({
       const loadedExamples = loadedWord
         ? await getExamplesByWordId(loadedWord.id)
         : [];
+      const bookmarked = loadedWord
+        ? await isBookmarked(loadedWord.id)
+        : false;
+      if (bookmarked && loadedWord) {
+        await touchBookmarkLastViewed(loadedWord.id);
+      }
 
       if (isMounted) {
         setWord(loadedWord);
