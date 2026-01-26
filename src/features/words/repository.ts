@@ -1,5 +1,5 @@
 import {getDB} from '../../db';
-import type {Example, Word} from './types';
+import type {Example, LanguageCode, Word} from './types';
 
 function getTodayDateString(): string {
   return new Date().toISOString().slice(0, 10);
@@ -111,6 +111,52 @@ export async function getWordsByIds(ids: string[]): Promise<Word[]> {
     (a, b) =>
       (orderMap.get(a.id) ?? 0) - (orderMap.get(b.id) ?? 0),
   );
+}
+
+export type WordFilterOptions = {
+  langs?: LanguageCode[];
+  categories?: string[];
+};
+
+export async function getWordsByFilters(
+  filters: WordFilterOptions = {},
+): Promise<Word[]> {
+  const db = await getDB();
+  const clauses: string[] = [];
+  const params: string[] = [];
+
+  if (filters.langs && filters.langs.length > 0) {
+    const placeholders = filters.langs.map(() => '?').join(', ');
+    clauses.push(`lang IN (${placeholders})`);
+    params.push(...filters.langs);
+  }
+
+  if (filters.categories && filters.categories.length > 0) {
+    const placeholders = filters.categories.map(() => '?').join(', ');
+    clauses.push(`category IN (${placeholders})`);
+    params.push(...filters.categories);
+  }
+
+  const whereClause = clauses.length > 0 ? `WHERE ${clauses.join(' AND ')}` : '';
+  const [result] = await db.executeSql(
+    `SELECT * FROM words ${whereClause};`,
+    params,
+  );
+
+  const words: Word[] = [];
+  for (let index = 0; index < result.rows.length; index += 1) {
+    const row = result.rows.item(index);
+    words.push({
+      id: row.id,
+      lang: row.lang,
+      word: row.word,
+      reading: row.reading ?? null,
+      meaningKo: row.meaning_ko,
+      category: row.category,
+    });
+  }
+
+  return words;
 }
 
 export async function getBookmarksWordIds(): Promise<string[]> {
