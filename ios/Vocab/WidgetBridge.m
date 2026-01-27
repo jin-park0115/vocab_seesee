@@ -31,7 +31,7 @@ RCT_EXPORT_METHOD(reloadAllTimelines)
 {
 #if __has_include(<WidgetKit/WidgetKit.h>)
   if (@available(iOS 14.0, *)) {
-    [[WidgetCenter sharedCenter] reloadAllTimelines];
+//    [[WidgetCenter sharedCenter] reloadAllTimelines];
   }
 #endif
 }

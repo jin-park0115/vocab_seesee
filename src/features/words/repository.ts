@@ -159,6 +159,41 @@ export async function getWordsByFilters(
   return words;
 }
 
+export async function getWordsByCategory(
+  categoryKey: string,
+  languages: LanguageCode[],
+): Promise<Word[]> {
+  const db = await getDB();
+  const clauses: string[] = ['category = ?'];
+  const params: string[] = [categoryKey];
+
+  if (languages && languages.length > 0) {
+    const placeholders = languages.map(() => '?').join(', ');
+    clauses.push(`lang IN (${placeholders})`);
+    params.push(...languages);
+  }
+
+  const [result] = await db.executeSql(
+    `SELECT * FROM words WHERE ${clauses.join(' AND ')};`,
+    params,
+  );
+
+  const words: Word[] = [];
+  for (let index = 0; index < result.rows.length; index += 1) {
+    const row = result.rows.item(index);
+    words.push({
+      id: row.id,
+      lang: row.lang,
+      word: row.word,
+      reading: row.reading ?? null,
+      meaningKo: row.meaning_ko,
+      category: row.category,
+    });
+  }
+
+  return words;
+}
+
 export async function getBookmarksWordIds(): Promise<string[]> {
   const db = await getDB();
   const [result] = await db.executeSql(

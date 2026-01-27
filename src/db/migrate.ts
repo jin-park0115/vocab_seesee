@@ -256,4 +256,48 @@ export async function migrateAndSeed(): Promise<void> {
 
     await db.executeSql('PRAGMA user_version = 4;');
   }
+
+  if (currentVersion < 5) {
+    await db.executeSql(
+      `CREATE TABLE IF NOT EXISTS settings (
+        key TEXT PRIMARY KEY,
+        value TEXT
+      );`,
+    );
+
+    await db.executeSql(
+      'INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?);',
+      ['selected_languages', 'en'],
+    );
+    await db.executeSql(
+      'INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?);',
+      ['selected_categories', ''],
+    );
+
+    await db.executeSql('PRAGMA user_version = 5;');
+  }
+
+  if (currentVersion < 6) {
+    await db.executeSql(
+      `CREATE TABLE IF NOT EXISTS today_auto_pool (
+        date_key TEXT NOT NULL,
+        language_key TEXT NOT NULL,
+        word_ids TEXT NOT NULL,
+        created_at TEXT NOT NULL,
+        PRIMARY KEY (date_key, language_key)
+      );`,
+    );
+
+    await db.executeSql(
+      `CREATE TABLE IF NOT EXISTS today_injected_items (
+        date_key TEXT NOT NULL,
+        word_id TEXT NOT NULL,
+        source TEXT NOT NULL,
+        last_seen_at TEXT NOT NULL,
+        PRIMARY KEY (date_key, word_id)
+      );`,
+    );
+
+    await db.executeSql('PRAGMA user_version = 6;');
+  }
 }

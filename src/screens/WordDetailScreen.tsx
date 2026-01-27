@@ -8,6 +8,7 @@ import {
   removeBookmark,
   upsertBookmark,
 } from '../features/words/repository';
+import {injectTodayWord} from '../features/today/TodayService';
 import NotFoundScreen from './NotFoundScreen';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'WordDetail'>;
@@ -17,6 +18,7 @@ export default function WordDetailScreen({
   navigation,
 }: Props): React.JSX.Element {
   const id = route.params?.id;
+  const source = route.params?.source;
   const isValidId = typeof id === 'string' && id.trim().length > 0;
   const [isSaved, setIsSaved] = useState(false);
 
@@ -30,6 +32,18 @@ export default function WordDetailScreen({
     };
     load();
   }, [id, isValidId]);
+
+  useEffect(() => {
+    if (!isValidId) {
+      return;
+    }
+    if (!source) {
+      return;
+    }
+    if (source === 'widget' || source === 'lockscreen' || source === 'deeplink') {
+      injectTodayWord(id.trim(), source);
+    }
+  }, [id, isValidId, source]);
 
   if (!isValidId) {
     return <NotFoundScreen />;

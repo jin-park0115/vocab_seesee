@@ -15,13 +15,12 @@ import WordCard from '../components/WordCard';
 import WordDetailSheet from '../components/WordDetailSheet';
 import {
   getBookmarksMap,
-  getBookmarksSorted,
-  getTodaysWordIds,
   getWordsByIds,
   removeBookmark,
   upsertBookmark,
 } from '../features/words/repository';
 import type {Word} from '../features/words/types';
+import {getTodayFeed} from '../features/today/TodayService';
 import type {RootStackParamList} from '../navigation';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Home'>;
@@ -29,22 +28,17 @@ type Props = NativeStackScreenProps<RootStackParamList, 'Home'>;
 export default function HomeScreen({navigation}: Props): React.JSX.Element {
   const [loading, setLoading] = useState(true);
   const [todayWords, setTodayWords] = useState<Word[]>([]);
-  const [savedWords, setSavedWords] = useState<Word[]>([]);
   const [bookmarks, setBookmarks] = useState<Set<string>>(new Set());
   const [selectedWordId, setSelectedWordId] = useState<string | null>(null);
 
   const loadData = useCallback(async () => {
     setLoading(true);
-    const [todayIds, bookmarksSet, savedList] = await Promise.all([
-      getTodaysWordIds(),
+    const [todayFeed, bookmarksSet] = await Promise.all([
+      getTodayFeed(),
       getBookmarksMap(),
-      getBookmarksSorted(),
     ]);
-
-    const todayList = await getWordsByIds(todayIds);
-
+    const todayList = await getWordsByIds(todayFeed.allIds);
     setTodayWords(todayList);
-    setSavedWords(savedList);
     setBookmarks(bookmarksSet);
     setLoading(false);
   }, []);
@@ -99,7 +93,7 @@ export default function HomeScreen({navigation}: Props): React.JSX.Element {
               <Text style={styles.sectionTitle}>Today's Words</Text>
               {todayWords.length === 0 ? (
                 <Text style={styles.emptyText}>
-                  Tap a word from the widget to start.
+                  Your daily words are loading.
                 </Text>
               ) : (
                 <View style={styles.cardList}>
@@ -108,31 +102,6 @@ export default function HomeScreen({navigation}: Props): React.JSX.Element {
                       key={word.id}
                       word={word}
                       isSaved={bookmarks.has(word.id)}
-                      onPress={() => handleOpenWord(word.id)}
-                      onToggleSaved={() => handleToggleBookmark(word.id)}
-                    />
-                  ))}
-                </View>
-              )}
-            </View>
-
-            <View style={styles.section}>
-              <Text style={styles.sectionTitle}>Saved Words</Text>
-              <Text style={styles.sectionCaption}>
-                Haven't seen these in a while
-              </Text>
-              {savedWords.length === 0 ? (
-                <Text style={styles.emptyText}>
-                  Save words to see them here.
-                </Text>
-              ) : (
-                <View style={styles.cardList}>
-                  {savedWords.map(word => (
-                    <WordCard
-                      key={word.id}
-                      word={word}
-                      isSaved={bookmarks.has(word.id)}
-                      showSavedBadge
                       onPress={() => handleOpenWord(word.id)}
                       onToggleSaved={() => handleToggleBookmark(word.id)}
                     />
