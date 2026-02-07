@@ -8,8 +8,10 @@ import {
   Text,
   View,
 } from 'react-native';
-import type {NativeStackScreenProps} from '@react-navigation/native-stack';
+import type {BottomTabScreenProps} from '@react-navigation/bottom-tabs';
+import type {CompositeScreenProps} from '@react-navigation/native';
 import {useFocusEffect} from '@react-navigation/native';
+import type {NativeStackScreenProps} from '@react-navigation/native-stack';
 
 import WordCard from '../components/WordCard';
 import WordDetailSheet from '../components/WordDetailSheet';
@@ -22,8 +24,12 @@ import {
 import type {Word} from '../features/words/types';
 import {getTodayFeed} from '../features/today/TodayService';
 import type {RootStackParamList} from '../navigation';
+import type {RootTabParamList} from '../navigation/Tabs';
 
-type Props = NativeStackScreenProps<RootStackParamList, 'Home'>;
+type Props = CompositeScreenProps<
+  BottomTabScreenProps<RootTabParamList, 'Home'>,
+  NativeStackScreenProps<RootStackParamList>
+>;
 
 export default function HomeScreen({navigation}: Props): React.JSX.Element {
   const [loading, setLoading] = useState(true);

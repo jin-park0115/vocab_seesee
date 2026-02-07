@@ -7,11 +7,17 @@ import {
   Text,
   View,
 } from 'react-native';
+import type {BottomTabScreenProps} from '@react-navigation/bottom-tabs';
+import type {CompositeScreenProps} from '@react-navigation/native';
 import type {NativeStackScreenProps} from '@react-navigation/native-stack';
 
 import type {RootStackParamList} from '../navigation';
+import type {RootTabParamList} from '../navigation/Tabs';
 
-type Props = NativeStackScreenProps<RootStackParamList, 'Tabs'>;
+type Props = CompositeScreenProps<
+  BottomTabScreenProps<RootTabParamList, 'Categories'>,
+  NativeStackScreenProps<RootStackParamList>
+>;
 
 type CategoryItem = {
   key: string;
