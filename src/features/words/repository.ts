@@ -5,10 +5,135 @@ function getTodayDateString(): string {
   return new Date().toISOString().slice(0, 10);
 }
 
+type WordsSchema = {
+  hasCategory: boolean;
+  hasCategories: boolean;
+  hasWord: boolean;
+  hasText: boolean;
+  hasMeaningKo: boolean;
+  hasMeaning: boolean;
+  hasLang: boolean;
+  hasLanguage: boolean;
+  hasReading: boolean;
+  hasPronunciation: boolean;
+};
+
+let wordsSchemaCache: WordsSchema | null = null;
+
+async function getWordsSchema(): Promise<WordsSchema> {
+  if (wordsSchemaCache) {
+    return wordsSchemaCache;
+  }
+  const db = await getDB();
+  const [result] = await db.executeSql("PRAGMA table_info('words');");
+  const columns = new Set<string>();
+  for (let index = 0; index < result.rows.length; index += 1) {
+    columns.add(result.rows.item(index).name);
+  }
+  wordsSchemaCache = {
+    hasCategory: columns.has('category'),
+    hasCategories: columns.has('categories'),
+    hasWord: columns.has('word'),
+    hasText: columns.has('text'),
+    hasMeaningKo: columns.has('meaning_ko'),
+    hasMeaning: columns.has('meaning'),
+    hasLang: columns.has('lang'),
+    hasLanguage: columns.has('language'),
+    hasReading: columns.has('reading'),
+    hasPronunciation: columns.has('pronunciation'),
+  };
+  return wordsSchemaCache;
+}
+
+function parseCategories(raw: unknown): string[] {
+  if (typeof raw !== 'string') {
+    return [];
+  }
+  const trimmed = raw.trim();
+  if (trimmed.length === 0) {
+    return [];
+  }
+  try {
+    const parsed = JSON.parse(trimmed);
+    return Array.isArray(parsed)
+      ? parsed.filter((item): item is string => typeof item === 'string')
+      : [];
+  } catch {
+    return trimmed.split(',').map(value => value.trim()).filter(Boolean);
+  }
+}
+
+function normalizeWordRow(row: any): Word {
+  const category =
+    row.category ??
+    parseCategories(row.categories)[0] ??
+    row.vibe ??
+    '';
+  return {
+    id: row.id,
+    lang: row.lang ?? row.language ?? 'en',
+    word: row.word ?? row.text ?? '',
+    reading: (row.reading ?? row.pronunciation ?? null) as string | null,
+    meaningKo: row.meaning_ko ?? row.meaning ?? '',
+    category,
+  };
+}
+
+async function getWordsSelectColumns(): Promise<{
+  columns: string;
+  langExpr: string;
+  categoryExpr: string | null;
+  hasCategories: boolean;
+  hasCategory: boolean;
+}> {
+  const schema = await getWordsSchema();
+  const langExpr = schema.hasLang
+    ? 'lang'
+    : schema.hasLanguage
+      ? 'language'
+      : "'en'";
+  const wordExpr = schema.hasWord ? 'word' : schema.hasText ? 'text' : "''";
+  const readingExpr = schema.hasReading
+    ? 'reading'
+    : schema.hasPronunciation
+      ? 'pronunciation'
+      : 'NULL';
+  const meaningExpr = schema.hasMeaningKo
+    ? 'meaning_ko'
+    : schema.hasMeaning
+      ? 'meaning'
+      : "''";
+  const categoryExpr = schema.hasCategory
+    ? 'category'
+    : schema.hasCategories
+      ? 'categories'
+      : null;
+  const columns = [
+    'id',
+    `${langExpr} as lang`,
+    `${wordExpr} as word`,
+    `${readingExpr} as reading`,
+    `${meaningExpr} as meaning_ko`,
+    categoryExpr ? `${categoryExpr} as category` : "'' as category",
+    schema.hasCategories ? 'categories' : "'' as categories",
+    schema.hasLanguage ? 'language' : "'' as language",
+    schema.hasText ? 'text' : "'' as text",
+    schema.hasMeaning ? 'meaning' : "'' as meaning",
+    schema.hasPronunciation ? 'pronunciation' : "'' as pronunciation",
+    schema.hasCategory ? 'category' : "'' as category_raw",
+    schema.hasWord ? 'word' : "'' as word_raw",
+    schema.hasReading ? 'reading' : "'' as reading_raw",
+    schema.hasMeaningKo ? 'meaning_ko' : "'' as meaning_ko_raw",
+    schema.hasLang ? 'lang' : "'' as lang_raw",
+  ].join(', ');
+  return {columns, langExpr, categoryExpr, hasCategories: schema.hasCategories, hasCategory: schema.hasCategory};
+}
+
 export async function getWordById(id: string): Promise<Word | null> {
   const db = await getDB();
+  const {columns} = await getWordsSelectColumns();
   const [result] = await db.executeSql(
-    'SELECT * FROM words WHERE id = ? LIMIT 1;',
+    `SELECT ${columns} FROM words WHERE id = ? LIMIT 1;`,
     [id],
   );
 
@@ -16,15 +141,7 @@ export async function getWordById(id: string): Promise<Word | null> {
     return null;
   }
 
-  const row = result.rows.item(0);
-  return {
-    id: row.id,
-    lang: row.lang,
-    word: row.word,
-    reading: row.reading ?? null,
-    meaningKo: row.meaning_ko,
-    category: row.category,
-  };
+  return normalizeWordRow(result.rows.item(0));
 }
 
 export async function getExamplesByWordId(wordId: string): Promise<Example[]> {
@@ -87,23 +204,16 @@ export async function getWordsByIds(ids: string[]): Promise<Word[]> {
   }
 
   const db = await getDB();
+  const {columns} = await getWordsSelectColumns();
   const placeholders = ids.map(() => '?').join(', ');
   const [result] = await db.executeSql(
-    `SELECT * FROM words WHERE id IN (${placeholders});`,
+    `SELECT ${columns} FROM words WHERE id IN (${placeholders});`,
     ids,
   );
 
   const rows: Word[] = [];
   for (let index = 0; index < result.rows.length; index += 1) {
-    const row = result.rows.item(index);
-    rows.push({
-      id: row.id,
-      lang: row.lang,
-      word: row.word,
-      reading: row.reading ?? null,
-      meaningKo: row.meaning_ko,
-      category: row.category,
-    });
+    rows.push(normalizeWordRow(result.rows.item(index)));
   }
 
   const orderMap = new Map(ids.map((id, index) => [id, index]));
@@ -122,38 +232,40 @@ export async function getWordsByFilters(
   filters: WordFilterOptions = {},
 ): Promise<Word[]> {
   const db = await getDB();
+  const {columns, langExpr, categoryExpr, hasCategories, hasCategory} =
+    await getWordsSelectColumns();
   const clauses: string[] = [];
   const params: string[] = [];
 
   if (filters.langs && filters.langs.length > 0) {
     const placeholders = filters.langs.map(() => '?').join(', ');
-    clauses.push(`lang IN (${placeholders})`);
+    clauses.push(`${langExpr} IN (${placeholders})`);
     params.push(...filters.langs);
   }
 
   if (filters.categories && filters.categories.length > 0) {
-    const placeholders = filters.categories.map(() => '?').join(', ');
-    clauses.push(`category IN (${placeholders})`);
-    params.push(...filters.categories);
+    if (hasCategory && categoryExpr) {
+      const placeholders = filters.categories.map(() => '?').join(', ');
+      clauses.push(`${categoryExpr} IN (${placeholders})`);
+      params.push(...filters.categories);
+    } else if (hasCategories) {
+      const likeClauses = filters.categories.map(() => `categories LIKE ?`);
+      clauses.push(`(${likeClauses.join(' OR ')})`);
+      params.push(
+        ...filters.categories.map(value => `%\"${value}\"%`),
+      );
+    }
   }
 
   const whereClause = clauses.length > 0 ? `WHERE ${clauses.join(' AND ')}` : '';
   const [result] = await db.executeSql(
-    `SELECT * FROM words ${whereClause};`,
+    `SELECT ${columns} FROM words ${whereClause};`,
     params,
   );
 
   const words: Word[] = [];
   for (let index = 0; index < result.rows.length; index += 1) {
-    const row = result.rows.item(index);
-    words.push({
-      id: row.id,
-      lang: row.lang,
-      word: row.word,
-      reading: row.reading ?? null,
-      meaningKo: row.meaning_ko,
-      category: row.category,
-    });
+    words.push(normalizeWordRow(result.rows.item(index)));
   }
 
   return words;
@@ -164,31 +276,35 @@ export async function getWordsByCategory(
   languages: LanguageCode[],
 ): Promise<Word[]> {
   const db = await getDB();
-  const clauses: string[] = ['category = ?'];
-  const params: string[] = [categoryKey];
+  const {columns, langExpr, categoryExpr, hasCategories, hasCategory} =
+    await getWordsSelectColumns();
+  const clauses: string[] = [];
+  const params: string[] = [];
+
+  if (hasCategory && categoryExpr) {
+    clauses.push(`${categoryExpr} = ?`);
+    params.push(categoryKey);
+  } else if (hasCategories) {
+    clauses.push('categories LIKE ?');
+    params.push(`%\"${categoryKey}\"%`);
+  }
 
   if (languages && languages.length > 0) {
     const placeholders = languages.map(() => '?').join(', ');
-    clauses.push(`lang IN (${placeholders})`);
+    clauses.push(`${langExpr} IN (${placeholders})`);
     params.push(...languages);
   }
 
   const [result] = await db.executeSql(
-    `SELECT * FROM words WHERE ${clauses.join(' AND ')};`,
+    `SELECT ${columns} FROM words ${
+      clauses.length > 0 ? `WHERE ${clauses.join(' AND ')}` : ''
+    };`,
     params,
   );
 
   const words: Word[] = [];
   for (let index = 0; index < result.rows.length; index += 1) {
-    const row = result.rows.item(index);
-    words.push({
-      id: row.id,
-      lang: row.lang,
-      word: row.word,
-      reading: row.reading ?? null,
-      meaningKo: row.meaning_ko,
-      category: row.category,
-    });
+    words.push(normalizeWordRow(result.rows.item(index)));
   }
 
   return words;

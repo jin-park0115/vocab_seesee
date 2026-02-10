@@ -15,11 +15,14 @@ export default function App(): React.JSX.Element {
 
     const init = async () => {
       try {
+        console.log('[DB] migrateAndSeed start');
         await migrateAndSeed();
+        console.log('[DB] migrateAndSeed done');
         if (isMounted) {
           setReady(true);
         }
       } catch (err) {
+        console.log('[DB] migrateAndSeed error', err);
         if (isMounted) {
           setError('Failed to initialize local database.');
         }

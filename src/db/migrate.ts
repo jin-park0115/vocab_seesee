@@ -115,8 +115,10 @@ export async function migrateAndSeed(): Promise<void> {
 
   const [versionResult] = await db.executeSql('PRAGMA user_version;');
   const currentVersion = versionResult.rows.item(0).user_version as number;
+  console.log('[DB] current user_version', currentVersion);
 
   if (currentVersion < 1) {
+    console.log('[DB] migrate v1');
     await db.executeSql(
       `CREATE TABLE IF NOT EXISTS words (
         id TEXT PRIMARY KEY,
@@ -181,6 +183,7 @@ export async function migrateAndSeed(): Promise<void> {
   }
 
   if (currentVersion < 2) {
+    console.log('[DB] migrate v2');
     const [examplesInfo] = await db.executeSql(
       "PRAGMA table_info('examples');",
     );
@@ -213,6 +216,7 @@ export async function migrateAndSeed(): Promise<void> {
   }
 
   if (currentVersion < 3) {
+    console.log('[DB] migrate v3');
     await db.executeSql(
       `CREATE TABLE IF NOT EXISTS exposures (
         date TEXT,
@@ -225,6 +229,7 @@ export async function migrateAndSeed(): Promise<void> {
   }
 
   if (currentVersion < 4) {
+    console.log('[DB] migrate v4');
     const [bookmarkInfo] = await db.executeSql(
       "PRAGMA table_info('bookmarks');",
     );
@@ -258,6 +263,7 @@ export async function migrateAndSeed(): Promise<void> {
   }
 
   if (currentVersion < 5) {
+    console.log('[DB] migrate v5');
     await db.executeSql(
       `CREATE TABLE IF NOT EXISTS settings (
         key TEXT PRIMARY KEY,
@@ -278,6 +284,7 @@ export async function migrateAndSeed(): Promise<void> {
   }
 
   if (currentVersion < 6) {
+    console.log('[DB] migrate v6');
     await db.executeSql(
       `CREATE TABLE IF NOT EXISTS today_auto_pool (
         date_key TEXT NOT NULL,
@@ -299,5 +306,157 @@ export async function migrateAndSeed(): Promise<void> {
     );
 
     await db.executeSql('PRAGMA user_version = 6;');
+  }
+
+  if (currentVersion < 7) {
+    console.log('[DB] migrate v7');
+    const [wordsInfo] = await db.executeSql("PRAGMA table_info('words');");
+    let hasLang = false;
+    for (let index = 0; index < wordsInfo.rows.length; index += 1) {
+      const row = wordsInfo.rows.item(index);
+      if (row.name === 'lang') {
+        hasLang = true;
+        break;
+      }
+    }
+
+    if (!hasLang) {
+      await db.executeSql('ALTER TABLE words ADD COLUMN lang TEXT;');
+    }
+
+    await db.executeSql(
+      `UPDATE words
+       SET lang = CASE
+         WHEN id LIKE 'en_%' THEN 'en'
+         WHEN id LIKE 'ja_%' THEN 'ja'
+         WHEN id LIKE 'zh_%' THEN 'zh'
+         ELSE 'en'
+       END
+       WHERE lang IS NULL OR lang = '';`,
+    );
+
+    await db.executeSql('PRAGMA user_version = 7;');
+  }
+
+  const [wordsTableResult] = await db.executeSql(
+    "SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'words';",
+  );
+  if (wordsTableResult.rows.length > 0) {
+    const [wordsInfo] = await db.executeSql("PRAGMA table_info('words');");
+    let hasLang = false;
+    for (let index = 0; index < wordsInfo.rows.length; index += 1) {
+      const row = wordsInfo.rows.item(index);
+      if (row.name === 'lang') {
+        hasLang = true;
+        break;
+      }
+    }
+
+    if (!hasLang) {
+      console.log('[DB] fixup: add missing words.lang');
+      await db.executeSql('ALTER TABLE words ADD COLUMN lang TEXT;');
+      await db.executeSql(
+        `UPDATE words
+         SET lang = CASE
+           WHEN id LIKE 'en_%' THEN 'en'
+           WHEN id LIKE 'ja_%' THEN 'ja'
+           WHEN id LIKE 'zh_%' THEN 'zh'
+           ELSE 'en'
+         END
+         WHERE lang IS NULL OR lang = '';`,
+      );
+    }
+  }
+
+  const [wordsInfoDebug] = await db.executeSql("PRAGMA table_info('words');");
+  const columns: string[] = [];
+  for (let index = 0; index < wordsInfoDebug.rows.length; index += 1) {
+    columns.push(wordsInfoDebug.rows.item(index).name);
+  }
+  console.log('[DB] words columns', columns);
+
+  const requiredColumns = new Set([
+    'id',
+    'lang',
+    'word',
+    'meaning_ko',
+    'category',
+  ]);
+  const hasAllRequired = [...requiredColumns].every(col =>
+    columns.includes(col),
+  );
+
+  if (!hasAllRequired) {
+    console.log('[DB] reset words/examples to v1 schema');
+    await db.executeSql('DROP TABLE IF EXISTS words;');
+    await db.executeSql('DROP TABLE IF EXISTS examples;');
+  }
+
+  await db.executeSql(
+    `CREATE TABLE IF NOT EXISTS words (
+      id TEXT PRIMARY KEY,
+      lang TEXT,
+      word TEXT,
+      reading TEXT NULL,
+      meaning_ko TEXT,
+      category TEXT
+    );`,
+  );
+  await db.executeSql(
+    `CREATE TABLE IF NOT EXISTS examples (
+      id TEXT PRIMARY KEY,
+      word_id TEXT,
+      sentence_native TEXT,
+      sentence_reading TEXT,
+      sentence_ko TEXT,
+      context_tag TEXT
+    );`,
+  );
+
+  const [countResult] = await db.executeSql(
+    'SELECT COUNT(*) as count FROM words;',
+  );
+  const wordCount = countResult.rows.item(0).count as number;
+  console.log('[DB] words count', wordCount);
+  if (wordCount === 0) {
+    console.log('[DB] seed words/examples');
+    await db.executeSql('DELETE FROM today_auto_pool;');
+    await db.executeSql('DELETE FROM today_injected_items;');
+    for (const word of WORDS) {
+      await db.executeSql(
+        `INSERT OR IGNORE INTO words (id, lang, word, reading, meaning_ko, category)
+         VALUES (?, ?, ?, ?, ?, ?);`,
+        [
+          word.id,
+          word.lang,
+          word.word,
+          word.reading,
+          word.meaningKo,
+          word.category,
+        ],
+      );
+    }
+
+    for (const example of EXAMPLES) {
+      await db.executeSql(
+        `INSERT OR IGNORE INTO examples (id, word_id, sentence_native, sentence_reading, sentence_ko, context_tag)
+         VALUES (?, ?, ?, ?, ?, ?);`,
+        [
+          example.id,
+          example.wordId,
+          example.sentenceNative,
+          example.sentenceReading,
+          example.sentenceKo,
+          example.contextTag,
+        ],
+      );
+    }
+  }
+  const [sampleResult] = await db.executeSql(
+    'SELECT * FROM words LIMIT 1;',
+  );
+  if (sampleResult.rows.length > 0) {
+    const sample = sampleResult.rows.item(0);
+    console.log('[DB] words sample', sample);
   }
 }

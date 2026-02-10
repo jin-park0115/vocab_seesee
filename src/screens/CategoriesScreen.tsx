@@ -22,6 +22,7 @@ type Props = CompositeScreenProps<
 type CategoryItem = {
   key: string;
   title: string;
+  icon: string;
 };
 
 type CategoryGroup = {
@@ -33,27 +34,27 @@ const CATEGORY_GROUPS: CategoryGroup[] = [
   {
     title: 'Basic',
     items: [
-      {key: 'daily', title: 'Daily verbs'},
-      {key: 'emotion', title: 'Emotion expressions'},
-      {key: 'adjective', title: 'Common adjectives'},
+      {key: 'daily', title: 'Daily verbs', icon: '☀️'},
+      {key: 'emotion', title: 'Emotion expressions', icon: '💭'},
+      {key: 'adjective', title: 'Common adjectives', icon: '✨'},
     ],
   },
   {
     title: 'Situational',
     items: [
-      {key: 'travel', title: 'Travel'},
-      {key: 'restaurant', title: 'Restaurant'},
-      {key: 'accommodation', title: 'Accommodation'},
-      {key: 'shopping', title: 'Shopping'},
-      {key: 'transportation', title: 'Transportation'},
-      {key: 'business', title: 'Business'},
+      {key: 'travel', title: 'Travel', icon: '🧳'},
+      {key: 'restaurant', title: 'Restaurant', icon: '🍽️'},
+      {key: 'accommodation', title: 'Accommodation', icon: '🛏️'},
+      {key: 'shopping', title: 'Shopping', icon: '🛍️'},
+      {key: 'transportation', title: 'Transportation', icon: '🚇'},
+      {key: 'business', title: 'Business', icon: '💼'},
     ],
   },
   {
     title: 'Vibe / Taste',
     items: [
-      {key: 'drama', title: 'Drama-style expressions'},
-      {key: 'dating', title: 'Dating / romance expressions'},
+      {key: 'drama', title: 'Drama-style expressions', icon: '🎭'},
+      {key: 'dating', title: 'Dating / romance expressions', icon: '💘'},
     ],
   },
 ];
@@ -68,26 +69,24 @@ export default function CategoriesScreen({
         <Text style={styles.subtitle}>Browse by situation or taste</Text>
       </View>
       <ScrollView contentContainerStyle={styles.list}>
-        {CATEGORY_GROUPS.map(group => (
-          <View key={group.title} style={styles.group}>
-            <Text style={styles.groupTitle}>{group.title}</Text>
-            <View style={styles.groupItems}>
-              {group.items.map(item => (
-                <Pressable
-                  key={item.key}
-                  style={styles.item}
-                  onPress={() =>
-                    navigation.navigate('CategoryWords', {
-                      categoryKey: item.key,
-                      title: item.title,
-                    })
-                  }>
-                  <Text style={styles.itemText}>{item.title}</Text>
-                </Pressable>
-              ))}
-            </View>
-          </View>
-        ))}
+        <View style={styles.pillsRow}>
+          {CATEGORY_GROUPS.flatMap(group => group.items).map(item => (
+            <Pressable
+              key={item.key}
+              style={styles.pill}
+              onPress={() =>
+                navigation.navigate('CategoryWords', {
+                  categoryKey: item.key,
+                  title: item.title,
+                })
+              }>
+              <View style={styles.iconBadge}>
+                <Text style={styles.icon}>{item.icon}</Text>
+              </View>
+              <Text style={styles.pillText}>{item.title}</Text>
+            </Pressable>
+          ))}
+        </View>
       </ScrollView>
     </SafeAreaView>
   );
@@ -96,45 +95,61 @@ export default function CategoriesScreen({
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#eef2ff',
+    backgroundColor: '#fbf6ef',
   },
   header: {
-    padding: 24,
-    gap: 6,
+    paddingHorizontal: 24,
+    paddingTop: 20,
+    paddingBottom: 8,
   },
   title: {
-    fontSize: 30,
-    fontWeight: '700',
-    color: '#0f172a',
+    fontSize: 26,
+    fontWeight: '600',
+    color: '#3b2f2b',
   },
   subtitle: {
-    fontSize: 14,
-    color: '#64748b',
+    marginTop: 4,
+    fontSize: 12,
+    color: '#8f847b',
   },
   list: {
     paddingHorizontal: 24,
-    paddingBottom: 32,
-    gap: 20,
+    paddingTop: 8,
+    paddingBottom: 40,
   },
-  group: {
-    gap: 10,
+  pillsRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 12,
   },
-  groupTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#1e293b',
-  },
-  groupItems: {
-    gap: 10,
-  },
-  item: {
-    paddingVertical: 14,
+  pill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    borderRadius: 999,
+    backgroundColor: '#efe4d7',
     paddingHorizontal: 16,
-    borderRadius: 16,
-    backgroundColor: '#f8fafc',
+    paddingVertical: 10,
+    shadowColor: '#000',
+    shadowOpacity: 0.06,
+    shadowRadius: 6,
+    shadowOffset: {width: 0, height: 3},
+    elevation: 2,
   },
-  itemText: {
+  iconBadge: {
+    height: 30,
+    width: 30,
+    borderRadius: 999,
+    backgroundColor: '#fff',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  icon: {
     fontSize: 16,
-    color: '#0f172a',
+  },
+  pillText: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: '#3b2f2b',
   },
 });
